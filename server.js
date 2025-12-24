@@ -1,10 +1,19 @@
 import dotenvx from "@dotenvx/dotenvx";
-import app from "./app.js";
+import express from "express";
 import connectDb from "./config/connectDB.js";
+import whatsappWebhook from "./webhooks/whatsapp.webhook.js";
+import adminRoutes from "./routes/admin.routes.js";
 
 dotenvx.config();
 
 const PORT = process.env.PORT || 4000;
+
+const app = express();
+
+app.use(express.json());
+
+app.use("/webhooks/whatsapp", whatsappWebhook);
+app.use("/admin", adminRoutes);
 
 const startServer = async () => {
     await connectDb();

@@ -24,6 +24,10 @@ export const parseMessage = (text = "") => {
         return { type: "CONFIRM_YES" }
     }
 
+    if (input === "done") {
+        return { type: "DONE_ADDING" }
+    }
+
     if (input === "status") {
         return { type: "CHECK_STATUS" }
     }

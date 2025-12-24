@@ -1,57 +1,79 @@
-export const processMessage = ({ session, command }) => {
-  console.log(
-    "PROCESS MESSAGE:",
-    "STATE =", session.state,
-    "COMMAND =", command.type
-  );
+import productService from "../services/product.service.js";
 
-  let nextSession = { ...session };
+export const processMessage = async ({ session, command }) => {
+  const nextSession = {
+    customerId: session.customerId,
+    state: session.state || "IDLE",
+    cart: Array.isArray(session.cart) ? session.cart : []
+  };
+
   let actions = [];
   let userResponse = "";
 
+  // IDLE
   if (nextSession.state === "IDLE") {
     if (command.type === "SHOW_MENU") {
-      nextSession.state = "BROWSING_MENU";
-      userResponse = "Available items:\n- Burger (2000)\n- Pizza (3000)";
-    } else {
-      userResponse = "Send 'menu' to see available items.";
-    }
-  }
+      const products = await productService.getAvailableProducts();
 
-  else if (nextSession.state === "BROWSING_MENU") {
-    if (command.type === "ADD_ITEM") {
-      nextSession.cart.push({
-        itemId: command.payload.itemName,
-        name: command.payload.itemName,
-        price: command.payload.itemName === "burger" ? 2000 : 3000,
-        quantity: command.payload.quantity
-      });
+      if (products.length === 0) {
+        userResponse = "No products available at the moment.";
+      } else {
+        userResponse =
+          "Available products:\n" +
+          products
+            .map((p) => `- ${p.name} (${p.price})`)
+            .join("\n") +
+          "\n\nAdd items using: add <name> <qty>\nType 'done' when finished.";
+      }
 
       nextSession.state = "BUILDING_CART";
-      userResponse = "Item added. Send 'confirm' to place order.";
     } else {
-      userResponse = "Use 'add <item> <qty>' to add items.";
+      userResponse = "Send 'menu' to see available products.";
     }
   }
 
+  // BUILDING_CART
   else if (nextSession.state === "BUILDING_CART") {
     if (command.type === "ADD_ITEM") {
-      nextSession.cart.push({
-        itemId: command.payload.itemName,
-        name: command.payload.itemName,
-        price: command.payload.itemName === "burger" ? 2000 : 3000,
-        quantity: command.payload.quantity
-      });
+      const product = await productService.findByName(command.payload.itemName);
 
-      userResponse = "Item added. Send 'confirm' when ready.";
+      if (!product) {
+        userResponse = "Item not found. Please check the name and try again.";
+      } else {
+        nextSession.cart.push({
+          productId: product._id,
+          name: product.name,
+          price: product.price,
+          quantity: command.payload.quantity
+        });
+
+        userResponse = "Item added. Add more or type 'done'.";
+      }
     }
 
-    if (command.type === "CONFIRM_ORDER") {
-      nextSession.state = "CONFIRMING_ORDER";
-      userResponse = "Are you sure you want to place the order? Reply 'yes'.";
+    else if (command.type === "DONE_ADDING") {
+      if (nextSession.cart.length === 0) {
+        userResponse = "Your cart is empty. Add at least one item.";
+      } else {
+        const summary = nextSession.cart
+          .map((i) => `${i.name} x${i.quantity}`)
+          .join("\n");
+
+        userResponse =
+          "Order summary:\n" +
+          summary +
+          "\n\nType 'confirm' to place your order.";
+
+        nextSession.state = "CONFIRMING_ORDER";
+      }
+    }
+
+    else {
+      userResponse = "Add items using 'add <name> <qty>' or type 'done'.";
     }
   }
 
+  // CONFIRMING_ORDER
   else if (nextSession.state === "CONFIRMING_ORDER") {
     if (command.type === "CONFIRM_YES") {
       actions.push({
@@ -66,26 +88,14 @@ export const processMessage = ({ session, command }) => {
       nextSession.state = "ORDER_PLACED";
       userResponse = "Order confirmed.";
     } else {
-      userResponse = "Reply 'yes' to confirm the order.";
+      userResponse = "Reply 'yes' to confirm your order.";
     }
   }
 
+  // ORDER_PLACED
   else if (nextSession.state === "ORDER_PLACED") {
     userResponse = "Your order is already being processed.";
   }
 
-  console.log("PROCESS RESULT:", {
-    nextState: nextSession.state,
-    cartSize: nextSession.cart.length,
-    actions
-  });
-
-  return {
-    nextSession,
-    actions,
-    userResponse
-  };
+  return { nextSession, actions, userResponse };
 };
-
-// REMEMBER TO REMOVE UNNECESSARY CONSOLE.LOG
-
