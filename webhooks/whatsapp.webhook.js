@@ -7,57 +7,40 @@ import sessionService from "../services/session.service.js";
 import createOrder from "../services/order.service.js";
 import messagingService from "../services/messaging.service.js";
 
+import Order from "../models/Order.js";
+import { formatCurrency } from "../utils/formatCurrency.js";
+import { getOrderStatusLabel } from "../utils/orderStatusLabel.js";
+
 import { isDuplicate } from "../utils/idempotency.js";
 import { SESSION_TTL_MS } from "../utils/sessionExpiry.js";
 import { generateOrderId } from "../utils/orderId.js";
-
 import { adaptWhatsAppPayload } from "../utils/whatsappAdapter.js";
 
 const router = express.Router();
-const NAIRA = "\u20A6";
 
-/**
- * POST — Receive WhatsApp messages
- */
 router.post("/", async (req, res) => {
   try {
-    console.log(
-      "RAW WEBHOOK BODY:",
-      JSON.stringify(req.body, null, 2)
-    );
     const payload = adaptWhatsAppPayload(req.body);
-
-    // Ignore non-text or unsupported events
-    if (!payload) {
-      console.log("Webhook ignored by adapter");
-      return res.sendStatus(200);
-    }
+    if (!payload) return res.sendStatus(200);
 
     const { senderId, messageId, text } = payload;
 
-    // Idempotency
     const duplicate = await isDuplicate(messageId);
-    if (duplicate) {
-      return res.sendStatus(200);
-    }
+    if (duplicate) return res.sendStatus(200);
 
     const now = Date.now();
     let session = await sessionService.get(senderId);
 
-    if (!session) {
+    if (!session || session.expiresAt < now) {
       session = {
         customerId: senderId,
         state: "IDLE",
         cart: [],
         expiresAt: new Date(now + SESSION_TTL_MS)
       };
-    } else if (session.expiresAt < now) {
-      session.state = "IDLE";
-      session.cart = [];
     }
 
     const command = parseMessage(text);
-
     const { nextSession, actions, userResponse } =
       await processMessage({ session, command });
 
@@ -66,68 +49,107 @@ router.post("/", async (req, res) => {
       expiresAt: new Date(now + SESSION_TTL_MS)
     });
 
-  for (const action of actions) {
-    if (action.type === "CREATE_ORDER") {
-      const totalPrice = action.payload.items.reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0
-      );
+    // ───────── ACTIONS ─────────
+    for (const action of actions) {
 
-      const order = await createOrder({
-        orderId: generateOrderId(),
-        customerId: action.payload.customerId,
-        items: action.payload.items,
-        totalPrice,
-        status: "NEW"
-      });
-
-      await messagingService.send(
-        senderId,
-        `Order ${order.orderId} placed successfully. Total: ₦${totalPrice}`
-      );
-    }
-
-    if (action.type === "FETCH_ORDER_HISTORY") {
-      const orders = await Order.find({
-        customerId: action.payload.customerId
-      })
-        .sort({ createdAt: -1 })
-        .limit(5);
-
-      if (orders.length === 0) {
-        await messagingService.send(
-          senderId,
-          "You don’t have any previous orders yet."
+      // CREATE ORDER
+      if (action.type === "CREATE_ORDER") {
+        const totalPrice = action.payload.items.reduce(
+          (sum, i) => sum + i.price * i.quantity,
+          0
         );
-      } else {
-        const history = orders
-          .map((o) => `• ${o.orderId} – ${o.status}`)
-          .join("\n");
+
+        const order = await createOrder({
+          orderId: generateOrderId(),
+          customerId: action.payload.customerId,
+          items: action.payload.items,
+          totalPrice,
+          status: "NEW"
+        });
 
         await messagingService.send(
           senderId,
-          "Your recent orders:\n" + history
+          `✅ Order placed successfully\n\n` +
+          `Order ID: ${order.orderId}\n` +
+          `Total: ${formatCurrency(order.totalPrice)}\n\n` +
+          `Status: Pending confirmation`
         );
       }
-    }
-  }
 
-  // ───── Send user response ─────
-  if (userResponse) {
-    if (typeof userResponse === "string") {
-      await messagingService.send(senderId, userResponse);
-    }
+      // ORDER HISTORY
+      if (action.type === "FETCH_ORDER_HISTORY") {
+        const orders = await Order.find({
+          customerId: action.payload.customerId
+        }).sort({ createdAt: -1 });
 
-    if (userResponse.type === "MULTI_MESSAGE") {
-      for (const msg of userResponse.messages) {
-        await messagingService.send(senderId, msg);
+        if (!orders.length) {
+          await messagingService.send(
+            senderId,
+            "You have no previous orders."
+          );
+        } else {
+          const history = orders.map((o) => {
+            const items = o.items
+              .map((i) => `${i.name} x${i.quantity}`)
+              .join(", ");
+
+            return (
+              `🧾 Order ID: ${o.orderId}\n` +
+              `Items: ${items}\n` +
+              `Total: ${formatCurrency(o.totalPrice)}\n` +
+              `Status: ${getOrderStatusLabel(o.status)}\n` +
+              `Date: ${new Date(o.createdAt).toLocaleString()}`
+            );
+          }).join("\n\n────────────\n\n");
+
+          await messagingService.send(
+            senderId,
+            "Your order history:\n\n" + history
+          );
+        }
+      }
+
+      // ORDER STATUS
+      if (action.type === "FETCH_ORDER_STATUS") {
+        const order = await Order.findOne({
+          orderId: action.payload.orderId,
+          customerId: action.payload.customerId
+        });
+
+        if (!order) {
+          await messagingService.send(
+            senderId,
+            "⏳ Your order is still being processed.\n" +
+            "If you just placed it, please wait a moment and try again."
+          );
+        } else {
+          await messagingService.send(
+            senderId,
+            `📦 Order Status\n\n` +
+            `Order ID: ${order.orderId}\n` +
+            `Status: ${getOrderStatusLabel(order.status)}\n` +
+            `Total: ${formatCurrency(order.totalPrice)}`
+          );
+        }
       }
     }
-  }
+
+    // ───────── USER RESPONSE ─────────
+    if (userResponse) {
+      if (typeof userResponse === "string") {
+        await messagingService.send(senderId, userResponse);
+      }
+
+      if (userResponse.type === "MULTI_MESSAGE") {
+        for (const msg of userResponse.messages) {
+          await messagingService.send(senderId, msg);
+        }
+      }
+    }
 
     return res.sendStatus(200);
-  } catch (error) {
-    console.error("WhatsApp webhook error:", error);
+  } catch (err) {
+    console.error("WhatsApp webhook error:", err);
     return res.sendStatus(500);
   }
 });

@@ -1,4 +1,5 @@
 import productService from "../services/product.service.js";
+import { formatCurrency } from "../utils/formatCurrency.js";
 
 export const processMessage = async ({ session, command }) => {
   const nextSession = {
@@ -10,20 +11,20 @@ export const processMessage = async ({ session, command }) => {
   let actions = [];
   let userResponse = null;
 
-  // ───────────────── IDLE ─────────────────
+  // ───────────── IDLE ─────────────
   if (nextSession.state === "IDLE") {
     if (command.type === "GREET") {
       userResponse =
-        "Hi there 👋 Welcome to OceanTech Watch Store.\n\n" +
+        "Welcome 👋\n\n" +
         "What would you like to do?\n" +
-        "- Reply 'menu' to view available products\n" +
+        "- Reply 'menu' to view products\n" +
         "- Reply 'order history' to view past orders";
     }
 
     else if (command.type === "SHOW_MENU") {
       const products = await productService.getAvailableProducts();
 
-      if (products.length === 0) {
+      if (!products.length) {
         userResponse = "No products available at the moment.";
       } else {
         userResponse = {
@@ -31,12 +32,11 @@ export const processMessage = async ({ session, command }) => {
           messages: [
             "Available products:\n" +
               products
-                .map((p) => `- ${p.name} (${p.price})`)
+                .map((p) => `- ${p.name} (${formatCurrency(p.price)})`)
                 .join("\n"),
             "Add items using: add <name> <qty>\nType 'done' when finished."
           ]
         };
-
         nextSession.state = "BUILDING_CART";
       }
     }
@@ -46,7 +46,6 @@ export const processMessage = async ({ session, command }) => {
         type: "FETCH_ORDER_HISTORY",
         payload: { customerId: nextSession.customerId }
       });
-      userResponse = "Fetching your order history…";
     }
 
     else {
@@ -54,7 +53,7 @@ export const processMessage = async ({ session, command }) => {
     }
   }
 
-  // ─────────────── BUILDING_CART ───────────────
+  // ───────────── BUILDING_CART ─────────────
   else if (nextSession.state === "BUILDING_CART") {
     if (command.type === "ADD_ITEM") {
       const product = await productService.findByName(
@@ -62,7 +61,7 @@ export const processMessage = async ({ session, command }) => {
       );
 
       if (!product) {
-        userResponse = "Item not found. Please check the name and try again.";
+        userResponse = "Item not found. Please check the name.";
       } else {
         nextSession.cart.push({
           productId: product._id,
@@ -76,11 +75,16 @@ export const processMessage = async ({ session, command }) => {
     }
 
     else if (command.type === "DONE_ADDING") {
-      if (nextSession.cart.length === 0) {
-        userResponse = "Your cart is empty. Add at least one item.";
+      if (!nextSession.cart.length) {
+        userResponse = "Your cart is empty.";
       } else {
         const summary = nextSession.cart
-          .map((i) => `${i.name} x${i.quantity}`)
+          .map(
+            (i) =>
+              `${i.name} x${i.quantity} (${formatCurrency(
+                i.price * i.quantity
+              )})`
+          )
           .join("\n");
 
         userResponse =
@@ -98,7 +102,7 @@ export const processMessage = async ({ session, command }) => {
     }
   }
 
-  // ─────────────── CONFIRMING_ORDER ───────────────
+  // ───────────── CONFIRMING_ORDER ─────────────
   else if (nextSession.state === "CONFIRMING_ORDER") {
     if (command.type === "CONFIRM_YES") {
       actions.push({
@@ -111,23 +115,25 @@ export const processMessage = async ({ session, command }) => {
 
       nextSession.cart = [];
       nextSession.state = "ORDER_PLACED";
-      userResponse = "Order confirmed ✅";
+
+      userResponse =
+        "📥 Order received successfully.\n" +
+        "We’ll notify you once it’s confirmed.";
     } else {
       userResponse = "Reply 'confirm' to place your order.";
     }
   }
 
-  // ─────────────── ORDER_PLACED ───────────────
+  // ───────────── ORDER_PLACED ─────────────
   else if (nextSession.state === "ORDER_PLACED") {
     if (command.type === "CHECK_STATUS") {
-      userResponse =
-        "Your order is currently being processed.\n" +
-        "You’ll receive updates here.";
-    }
-
-    else if (command.type === "NEW_ORDER") {
-      nextSession.state = "IDLE";
-      userResponse = "Sure 👍 Reply 'menu' to start a new order.";
+      actions.push({
+        type: "FETCH_ORDER_STATUS",
+        payload: {
+          customerId: nextSession.customerId,
+          orderId: command.payload.orderId
+        }
+      });
     }
 
     else if (command.type === "ORDER_HISTORY") {
@@ -135,16 +141,20 @@ export const processMessage = async ({ session, command }) => {
         type: "FETCH_ORDER_HISTORY",
         payload: { customerId: nextSession.customerId }
       });
-      userResponse = "Fetching your order history…";
+    }
+
+    else if (command.type === "NEW_ORDER") {
+      nextSession.state = "IDLE";
+      userResponse = "Sure 👍 Reply 'menu' to start a new order.";
     }
 
     else {
       userResponse =
-        "Your order is already being processed.\n\n" +
-        "What would you like to do?\n" +
-        "- Reply 'status' to check order status\n" +
-        "- Reply 'new order' to place another order\n" +
-        "- Reply 'order history' to view past orders";
+        "Your order is being processed.\n\n" +
+        "Options:\n" +
+        "- Reply 'status <orderId>' to check status\n" +
+        "- Reply 'order history' to view past orders\n" +
+        "- Reply 'new order' to place another order";
     }
   }
 
