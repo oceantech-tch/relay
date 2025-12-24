@@ -11,16 +11,29 @@ import { isDuplicate } from "../utils/idempotency.js";
 import { SESSION_TTL_MS } from "../utils/sessionExpiry.js";
 import { generateOrderId } from "../utils/orderId.js";
 
+import { adaptWhatsAppPayload } from "../utils/whatsappAdapter.js";
+
 const router = express.Router();
 const NAIRA = "\u20A6";
 
+/**
+ * POST — Receive WhatsApp messages
+ */
 router.post("/", async (req, res) => {
   try {
-    const { senderId, messageId, text } = req.body;
+    console.log(
+      "RAW WEBHOOK BODY:",
+      JSON.stringify(req.body, null, 2)
+    );
+    const payload = adaptWhatsAppPayload(req.body);
 
-    if (!senderId || !messageId || !text) {
-      return res.status(400).json({ message: "Invalid webhook payload" });
+    // Ignore non-text or unsupported events
+    if (!payload) {
+      console.log("Webhook ignored by adapter");
+      return res.sendStatus(200);
     }
+
+    const { senderId, messageId, text } = payload;
 
     // Idempotency
     const duplicate = await isDuplicate(messageId);
@@ -45,41 +58,72 @@ router.post("/", async (req, res) => {
 
     const command = parseMessage(text);
 
-    const { nextSession, actions, userResponse } = processMessage({
-      session,
-      command
-    });
+    const { nextSession, actions, userResponse } =
+      await processMessage({ session, command });
 
     await sessionService.save({
       ...nextSession,
       expiresAt: new Date(now + SESSION_TTL_MS)
     });
 
-    for (const action of actions) {
-      if (action.type === "CREATE_ORDER") {
-        const totalPrice = action.payload.items.reduce(
-          (sum, item) => sum + item.price * item.quantity,
-          0
-        );
+  for (const action of actions) {
+    if (action.type === "CREATE_ORDER") {
+      const totalPrice = action.payload.items.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0
+      );
 
-        const order = await createOrder({
-          orderId: generateOrderId(),
-          customerId: action.payload.customerId,
-          items: action.payload.items,
-          totalPrice,
-          status: "NEW"
-        });
+      const order = await createOrder({
+        orderId: generateOrderId(),
+        customerId: action.payload.customerId,
+        items: action.payload.items,
+        totalPrice,
+        status: "NEW"
+      });
+
+      await messagingService.send(
+        senderId,
+        `Order ${order.orderId} placed successfully. Total: ₦${totalPrice}`
+      );
+    }
+
+    if (action.type === "FETCH_ORDER_HISTORY") {
+      const orders = await Order.find({
+        customerId: action.payload.customerId
+      })
+        .sort({ createdAt: -1 })
+        .limit(5);
+
+      if (orders.length === 0) {
+        await messagingService.send(
+          senderId,
+          "You don’t have any previous orders yet."
+        );
+      } else {
+        const history = orders
+          .map((o) => `• ${o.orderId} – ${o.status}`)
+          .join("\n");
 
         await messagingService.send(
           senderId,
-          `Order ${order.orderId} placed successfully. Total: ${NAIRA}${totalPrice}`
+          "Your recent orders:\n" + history
         );
       }
     }
+  }
 
-    if (userResponse) {
+  // ───── Send user response ─────
+  if (userResponse) {
+    if (typeof userResponse === "string") {
       await messagingService.send(senderId, userResponse);
     }
+
+    if (userResponse.type === "MULTI_MESSAGE") {
+      for (const msg of userResponse.messages) {
+        await messagingService.send(senderId, msg);
+      }
+    }
+  }
 
     return res.sendStatus(200);
   } catch (error) {

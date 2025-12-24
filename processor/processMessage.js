@@ -8,34 +8,58 @@ export const processMessage = async ({ session, command }) => {
   };
 
   let actions = [];
-  let userResponse = "";
+  let userResponse = null;
 
-  // IDLE
+  // ───────────────── IDLE ─────────────────
   if (nextSession.state === "IDLE") {
-    if (command.type === "SHOW_MENU") {
+    if (command.type === "GREET") {
+      userResponse =
+        "Hi there 👋 Welcome to OceanTech Watch Store.\n\n" +
+        "What would you like to do?\n" +
+        "- Reply 'menu' to view available products\n" +
+        "- Reply 'order history' to view past orders";
+    }
+
+    else if (command.type === "SHOW_MENU") {
       const products = await productService.getAvailableProducts();
 
       if (products.length === 0) {
         userResponse = "No products available at the moment.";
       } else {
-        userResponse =
-          "Available products:\n" +
-          products
-            .map((p) => `- ${p.name} (${p.price})`)
-            .join("\n") +
-          "\n\nAdd items using: add <name> <qty>\nType 'done' when finished.";
-      }
+        userResponse = {
+          type: "MULTI_MESSAGE",
+          messages: [
+            "Available products:\n" +
+              products
+                .map((p) => `- ${p.name} (${p.price})`)
+                .join("\n"),
+            "Add items using: add <name> <qty>\nType 'done' when finished."
+          ]
+        };
 
-      nextSession.state = "BUILDING_CART";
-    } else {
-      userResponse = "Send 'menu' to see available products.";
+        nextSession.state = "BUILDING_CART";
+      }
+    }
+
+    else if (command.type === "ORDER_HISTORY") {
+      actions.push({
+        type: "FETCH_ORDER_HISTORY",
+        payload: { customerId: nextSession.customerId }
+      });
+      userResponse = "Fetching your order history…";
+    }
+
+    else {
+      userResponse = "Reply 'menu' to view available products.";
     }
   }
 
-  // BUILDING_CART
+  // ─────────────── BUILDING_CART ───────────────
   else if (nextSession.state === "BUILDING_CART") {
     if (command.type === "ADD_ITEM") {
-      const product = await productService.findByName(command.payload.itemName);
+      const product = await productService.findByName(
+        command.payload.itemName
+      );
 
       if (!product) {
         userResponse = "Item not found. Please check the name and try again.";
@@ -69,11 +93,12 @@ export const processMessage = async ({ session, command }) => {
     }
 
     else {
-      userResponse = "Add items using 'add <name> <qty>' or type 'done'.";
+      userResponse =
+        "Add items using 'add <name> <qty>' or type 'done'.";
     }
   }
 
-  // CONFIRMING_ORDER
+  // ─────────────── CONFIRMING_ORDER ───────────────
   else if (nextSession.state === "CONFIRMING_ORDER") {
     if (command.type === "CONFIRM_YES") {
       actions.push({
@@ -86,15 +111,41 @@ export const processMessage = async ({ session, command }) => {
 
       nextSession.cart = [];
       nextSession.state = "ORDER_PLACED";
-      userResponse = "Order confirmed.";
+      userResponse = "Order confirmed ✅";
     } else {
-      userResponse = "Reply 'yes' to confirm your order.";
+      userResponse = "Reply 'confirm' to place your order.";
     }
   }
 
-  // ORDER_PLACED
+  // ─────────────── ORDER_PLACED ───────────────
   else if (nextSession.state === "ORDER_PLACED") {
-    userResponse = "Your order is already being processed.";
+    if (command.type === "CHECK_STATUS") {
+      userResponse =
+        "Your order is currently being processed.\n" +
+        "You’ll receive updates here.";
+    }
+
+    else if (command.type === "NEW_ORDER") {
+      nextSession.state = "IDLE";
+      userResponse = "Sure 👍 Reply 'menu' to start a new order.";
+    }
+
+    else if (command.type === "ORDER_HISTORY") {
+      actions.push({
+        type: "FETCH_ORDER_HISTORY",
+        payload: { customerId: nextSession.customerId }
+      });
+      userResponse = "Fetching your order history…";
+    }
+
+    else {
+      userResponse =
+        "Your order is already being processed.\n\n" +
+        "What would you like to do?\n" +
+        "- Reply 'status' to check order status\n" +
+        "- Reply 'new order' to place another order\n" +
+        "- Reply 'order history' to view past orders";
+    }
   }
 
   return { nextSession, actions, userResponse };

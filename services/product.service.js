@@ -2,13 +2,22 @@ import Product from "../models/Product.js";
 
 const productService = {
     async getAvailableProducts() {
-        return Product.find({ available: true });
+        const products = await Product.find({
+            $or: [
+                { available: true },
+                { available: true }
+            ]
+        });
+        return products;
     },
 
     async findByName(name) {
         return Product.findOne({
-            name: new RegExp(`^${name}$`, "i"),
-            available: true
+            name: new RegExp(name, "i"),
+            $or: [
+                { available: true },
+                { available: true }
+            ]
         });
     }
 };

@@ -1,36 +1,54 @@
-export const parseMessage = (text = "") => {
-    const input = text.toLowerCase().trim();
+export const parseMessage = (text) => {
+  if (!text) return { type: "UNKNOWN" };
 
-    if (["menu", "hi", "start", "hello"].includes(input)) {
-        return { type: "SHOW_MENU" }
+  const normalized = text.trim().toLowerCase();
+
+  // Greetings
+  if (/^(hi|hello|hey)$/i.test(normalized)) {
+    return { type: "GREET" };
+  }
+
+  // Menu
+  if (normalized === "menu") {
+    return { type: "SHOW_MENU" };
+  }
+
+  // Add item: add <name> <qty>
+  if (normalized.startsWith("add ")) {
+    const parts = normalized.split(" ");
+    const quantity = Number(parts[parts.length - 1]);
+
+    if (!Number.isNaN(quantity)) {
+      const itemName = parts.slice(1, -1).join(" ");
+      return {
+        type: "ADD_ITEM",
+        payload: { itemName, quantity }
+      };
     }
+  }
 
-    if (input.startsWith("add")) {
-        const parts = input.split(" ");
-        const itemName = parts[1];
-        const quantity = Number(parts[2]) || 1;
+  // Done adding
+  if (normalized === "done") {
+    return { type: "DONE_ADDING" };
+  }
 
-        return {
-            type: "ADD_ITEM",
-            payload: { itemName, quantity }
-        };
-    }
+  // Confirm order
+  if (normalized === "confirm" || normalized === "yes") {
+    return { type: "CONFIRM_YES" };
+  }
 
-    if (input === "confirm") {
-        return { type: "CONFIRM_ORDER" }
-    }
+  // Post-order actions
+  if (normalized === "status" || normalized === "track order") {
+    return { type: "CHECK_STATUS" };
+  }
 
-    if (input === "yes") {
-        return { type: "CONFIRM_YES" }
-    }
+  if (normalized === "new order") {
+    return { type: "NEW_ORDER" };
+  }
 
-    if (input === "done") {
-        return { type: "DONE_ADDING" }
-    }
+  if (normalized === "order history") {
+    return { type: "ORDER_HISTORY" };
+  }
 
-    if (input === "status") {
-        return { type: "CHECK_STATUS" }
-    }
-
-    return { type: "UNKNOWN" };
+  return { type: "UNKNOWN" };
 };
