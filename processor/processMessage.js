@@ -11,7 +11,7 @@ export const processMessage = async ({ session, command }) => {
   let actions = [];
   let userResponse = null;
 
-  // ───── CANCEL ANYTIME BEFORE CONFIRMATION ─────
+  // ───── CANCEL CURRENT FLOW (ANYTIME BEFORE CONFIRMATION) ─────
   if (command.type === "CANCEL_FLOW") {
     nextSession.state = "IDLE";
     nextSession.cart = [];
@@ -23,6 +23,51 @@ export const processMessage = async ({ session, command }) => {
     };
   }
 
+  // ───── GLOBAL COMMANDS (WORK IN ANY STATE) ─────
+  if (command.type === "ORDER_HISTORY") {
+    actions.push({
+      type: "FETCH_ORDER_HISTORY",
+      payload: { customerId: nextSession.customerId }
+    });
+
+    return { nextSession, actions, userResponse: null };
+  }
+
+  if (command.type === "CHECK_STATUS") {
+    actions.push({
+      type: "FETCH_ORDER_STATUS",
+      payload: {
+        customerId: nextSession.customerId,
+        orderId: command.payload.orderId
+      }
+    });
+
+    return { nextSession, actions, userResponse: null };
+  }
+
+  if (command.type === "CANCEL_ORDER") {
+    actions.push({
+      type: "CANCEL_ORDER",
+      payload: {
+        customerId: nextSession.customerId,
+        orderId: command.payload.orderId
+      }
+    });
+
+    return { nextSession, actions, userResponse: null };
+  }
+
+  if (command.type === "NEW_ORDER") {
+    nextSession.state = "IDLE";
+    nextSession.cart = [];
+
+    return {
+      nextSession,
+      actions,
+      userResponse: "Sure 👍 Reply 'menu' to start a new order."
+    };
+  }
+
   // ───────────── IDLE ─────────────
   if (nextSession.state === "IDLE") {
     if (command.type === "GREET") {
@@ -30,7 +75,8 @@ export const processMessage = async ({ session, command }) => {
         "Welcome 👋\n\n" +
         "Reply:\n" +
         "- 'menu' to view products\n" +
-        "- 'order history' to view past orders";
+        "- 'order history' to view past orders\n" +
+        "- 'status <orderId>' to check an order";
     }
 
     else if (command.type === "SHOW_MENU") {
@@ -58,7 +104,6 @@ export const processMessage = async ({ session, command }) => {
   // ───────────── BUILDING_CART ─────────────
   else if (nextSession.state === "BUILDING_CART") {
 
-    // view cart
     if (command.type === "VIEW_CART") {
       if (!nextSession.cart.length) {
         userResponse = "🛒 Your cart is empty.";
@@ -76,7 +121,6 @@ export const processMessage = async ({ session, command }) => {
       }
     }
 
-    // delete item
     else if (command.type === "DELETE_ITEM") {
       const before = nextSession.cart.length;
 
@@ -91,7 +135,6 @@ export const processMessage = async ({ session, command }) => {
       }
     }
 
-    // add item
     else if (command.type === "ADD_ITEM") {
       const product = await productService.findByName(
         command.payload.itemName
@@ -111,7 +154,6 @@ export const processMessage = async ({ session, command }) => {
       }
     }
 
-    // done
     else if (command.type === "DONE_ADDING") {
       if (!nextSession.cart.length) {
         userResponse = "Your cart is empty.";
@@ -165,43 +207,6 @@ export const processMessage = async ({ session, command }) => {
 
   // ───────────── ORDER_PLACED ─────────────
   else if (nextSession.state === "ORDER_PLACED") {
-
-  if (command.type === "ORDER_HISTORY") {
-    actions.push({
-      type: "FETCH_ORDER_HISTORY",
-      payload: { customerId: nextSession.customerId }
-    });
-    userResponse = null;
-  }
-
-  else if (command.type === "CHECK_STATUS") {
-    actions.push({
-      type: "FETCH_ORDER_STATUS",
-      payload: {
-        customerId: nextSession.customerId,
-        orderId: command.payload.orderId
-      }
-    });
-    userResponse = null;
-  }
-
-  else if (command.type === "CANCEL_ORDER") {
-    actions.push({
-      type: "CANCEL_ORDER",
-      payload: {
-        customerId: nextSession.customerId,
-        orderId: command.payload.orderId
-      }
-    });
-    userResponse = null;
-  }
-
-  else if (command.type === "NEW_ORDER") {
-    nextSession.state = "IDLE";
-    userResponse = "Sure 👍 Reply 'menu' to start a new order.";
-  }
-
-  else {
     userResponse =
       "Your order is being processed.\n\n" +
       "Options:\n" +
@@ -210,7 +215,6 @@ export const processMessage = async ({ session, command }) => {
       "- order history\n" +
       "- new order";
   }
-}
 
   return { nextSession, actions, userResponse };
 };

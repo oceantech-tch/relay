@@ -85,7 +85,7 @@ router.post("/", async (req, res) => {
         if (!orders.length) {
           await messagingService.send(
             senderId,
-            "You have no previous orders."
+            "You have no previous orders. Reply 'menu' to place an order"
           );
         } else {
           const history = orders.map((o) => {
