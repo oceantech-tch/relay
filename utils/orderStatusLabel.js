@@ -1,14 +1,23 @@
 export const getOrderStatusLabel = (status) => {
-  switch (status) {
-    case "NEW":
-      return "Pending confirmation";
-    case "PREPARING":
-      return "Preparing";
-    case "READY":
-      return "Ready";
-    case "DELIVERED":
-      return "Delivered";
-    default:
-      return "Processing";
+  if (status === "PENDING CONFIRMATION") {
+    return "Pending confirmation";
   }
+
+  if (status === "PREPARING") {
+    return "Preparing YOUR your order";
+  }
+
+  if (status === "READY") {
+    return "Ready for delivery";
+  }
+
+  if (status === "DELIVERED") {
+    return "Delivered";
+  }
+
+  if (status === "CANCELLED") {
+    return "Cancelled";
+  }
+
+  return "Unknown status";
 };

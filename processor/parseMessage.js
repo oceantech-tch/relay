@@ -1,51 +1,94 @@
 export const parseMessage = (text) => {
-  if (!text) return { type: "UNKNOWN" };
+  const input = text.trim().toLowerCase();
 
-  const normalized = text.trim().toLowerCase();
-
-  if (/^(hi|hello|hey)$/i.test(normalized)) {
+  // greetings
+  if (input === "hi" || input === "hello" || input === "hey") {
     return { type: "GREET" };
   }
 
-  if (normalized === "menu") {
+  // menu
+  if (input === "menu") {
     return { type: "SHOW_MENU" };
   }
 
-  if (normalized.startsWith("add ")) {
-    const parts = normalized.split(" ");
-    const quantity = Number(parts[parts.length - 1]);
-
-    if (!Number.isNaN(quantity)) {
-      const itemName = parts.slice(1, -1).join(" ");
-      return {
-        type: "ADD_ITEM",
-        payload: { itemName, quantity }
-      };
-    }
+  // cancel current flow
+  if (input === "cancel") {
+    return { type: "CANCEL_FLOW" };
   }
 
-  if (normalized === "done") {
-    return { type: "DONE_ADDING" };
+  // view cart
+  if (input === "view cart") {
+    return { type: "VIEW_CART" };
   }
 
-  if (normalized === "confirm" || normalized === "yes") {
-    return { type: "CONFIRM_YES" };
-  }
-
-  if (normalized.startsWith("status ")) {
-    const orderId = normalized.replace("status ", "").trim();
+  // delete item
+  if (input.startsWith("delete ")) {
     return {
-      type: "CHECK_STATUS",
-      payload: { orderId }
+      type: "DELETE_ITEM",
+      payload: {
+        itemName: input.replace("delete ", "").trim()
+      }
     };
   }
 
-  if (normalized === "order history") {
+  // add item
+  if (input.startsWith("add ")) {
+    const parts = input.replace("add ", "").split(" ");
+    const quantity = parseInt(parts.pop(), 10);
+    const itemName = parts.join(" ");
+
+    if (!itemName || isNaN(quantity)) {
+      return { type: "INVALID" };
+    }
+
+    return {
+      type: "ADD_ITEM",
+      payload: { itemName, quantity }
+    };
+  }
+
+  // done adding
+  if (input === "done") {
+    return { type: "DONE_ADDING" };
+  }
+
+  // confirm
+  if (input === "confirm") {
+    return { type: "CONFIRM_YES" };
+  }
+
+  // new order
+  if (input === "new order") {
+    return { type: "NEW_ORDER" };
+  }
+
+  // order history
+  if (input === "order history") {
     return { type: "ORDER_HISTORY" };
   }
 
-  if (normalized === "new order") {
-    return { type: "NEW_ORDER" };
+  // cancel order
+  if (input.startsWith("cancel order ")) {
+    console.log(input)
+    const orderId = input
+    .replace(/cancel order/i, "")
+    .trim()
+    .toUpperCase();
+
+    return {
+      type: "CANCEL_ORDER",
+      payload: {
+        orderId
+      }
+    };
+  }
+
+  // status ORD-xxxx
+  if (input.startsWith("status ")) {
+    return {
+      type: "CHECK_STATUS",
+      payload: { orderId: input.replace("status ", "").trim() }
+    };
   }
 
   return { type: "UNKNOWN" };

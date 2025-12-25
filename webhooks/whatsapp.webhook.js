@@ -64,7 +64,7 @@ router.post("/", async (req, res) => {
           customerId: action.payload.customerId,
           items: action.payload.items,
           totalPrice,
-          status: "NEW"
+          status: "PENDING CONFIRMATION"
         });
 
         await messagingService.send(
@@ -131,6 +131,38 @@ router.post("/", async (req, res) => {
             `Total: ${formatCurrency(order.totalPrice)}`
           );
         }
+      }
+
+      // cancel order
+      if (action.type === "CANCEL_ORDER") {
+        const order = await Order.findOne({
+          orderId: action.payload.orderId.toUpperCase(),
+          customerId: action.payload.customerId
+        });
+
+        if (!order) {
+          await messagingService.send(
+            senderId,
+            "❌ Order not found. Please check the Order ID."
+          );
+          continue;
+        }
+
+        if (order.status !== "PENDING CONFIRMATION") {
+          await messagingService.send(
+            senderId,
+            "🚫 This order can no longer be cancelled because it has already been confirmed or processed."
+          );
+          continue;
+        }
+
+        order.status = "CANCELLED";
+        await order.save();
+
+        await messagingService.send(
+          senderId,
+          `🛑 Order cancelled successfully.\n\nOrder ID: ${order.orderId}`
+        );
       }
     }
 

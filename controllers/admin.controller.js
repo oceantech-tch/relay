@@ -1,6 +1,6 @@
 import Order from "../models/Order.js";
 import messagingService from "../services/messaging.service.js";
-import { getStatusMessage } from "../utils/orderStatusMessage.js";
+import { getCustomerStatusMessage } from "../utils/orderStatusMessage.js";
 import { isValidStatusTransition } from "../utils/orderStatusFlow.js";
 
 export const updateOrderStatus = async (req, res) => {
@@ -8,13 +8,17 @@ export const updateOrderStatus = async (req, res) => {
     const { status } = req.body;
 
     if (!status) {
-      return res.status(400).json({ message: "Status is required" });
+      return res.status(400).json({
+        message: "Status is required"
+      });
     }
 
     const order = await Order.findById(req.params.id);
 
     if (!order) {
-      return res.status(404).json({ message: "Order not found" });
+      return res.status(404).json({
+        message: "Order not found"
+      });
     }
 
     if (!isValidStatusTransition(order.status, status)) {
@@ -26,10 +30,17 @@ export const updateOrderStatus = async (req, res) => {
     order.status = status;
     await order.save();
 
-    const message = getStatusMessage(order.orderId, status);
-    await messagingService.send(order.customerId, message);
+    // 🔔 Notify customer automatically (event-driven)
+    const customerMessage = getCustomerStatusMessage(order);
 
-    return res.json(order);
+    if (customerMessage) {
+      await messagingService.send(order.customerId, customerMessage);
+    }
+
+    return res.json({
+      message: "Order status updated successfully",
+      order
+    });
   } catch (e) {
     console.error("Error updating order status:", e);
     return res.status(500).json({
