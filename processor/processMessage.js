@@ -72,7 +72,7 @@ export const processMessage = async ({ session, command }) => {
   if (nextSession.state === "IDLE") {
     if (command.type === "GREET") {
       userResponse =
-        "Welcome 👋\n\n" +
+        "Welcome Ocean 👋\n\n" +
         "Reply:\n" +
         "- 'menu' to view products\n" +
         "- 'order history' to view past orders\n" +
