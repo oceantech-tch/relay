@@ -1,6 +1,6 @@
 # WhatsApp Ordering System (Backend-Focused)
 
-A backend-driven WhatsApp ordering system that allows customers to browse products, build carts, place orders, and receive real-time updates — entirely through WhatsApp messages.
+A backend-driven WhatsApp ordering system that allows customers to browse products, build carts, place orders, and receive real-time updates - entirely through WhatsApp messages.
 
 This project focuses on **conversational state management**, **webhook-driven workflows**, and **order lifecycle control**, rather than UI complexity or payments.
 
