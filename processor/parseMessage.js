@@ -69,7 +69,6 @@ export const parseMessage = (text) => {
 
   // cancel order
   if (input.startsWith("cancel order ")) {
-    console.log(input)
     const orderId = input
     .replace(/cancel order/i, "")
     .trim()
