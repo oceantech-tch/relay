@@ -76,6 +76,7 @@ export const processMessage = async ({ session, command }) => {
       if (!nextSession.hasGreeted) {
         nextSession.hasGreeted = true;
 
+        const name = nextSession.customerName || "there";
         userResponse =
           `Welcome ${name} 👋\n\n` +
           "Reply:\n" +
