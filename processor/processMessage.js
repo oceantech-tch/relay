@@ -5,7 +5,8 @@ export const processMessage = async ({ session, command }) => {
   const nextSession = {
     customerId: session.customerId,
     state: session.state || "IDLE",
-    cart: Array.isArray(session.cart) ? session.cart : []
+    cart: Array.isArray(session.cart) ? session.cart : [],
+    hasGreeted: session.hasGreeted || false
   };
 
   let actions = [];
@@ -15,6 +16,7 @@ export const processMessage = async ({ session, command }) => {
   if (command.type === "CANCEL_FLOW") {
     nextSession.state = "IDLE";
     nextSession.cart = [];
+    nextSession.hasGreeted = false;
 
     return {
       nextSession,
@@ -71,12 +73,18 @@ export const processMessage = async ({ session, command }) => {
   // ───────────── IDLE ─────────────
   if (nextSession.state === "IDLE") {
     if (command.type === "GREET") {
-      userResponse =
-        "Welcome Ocean 👋\n\n" +
-        "Reply:\n" +
-        "- 'menu' to view products\n" +
-        "- 'order history' to view past orders\n" +
-        "- 'status <orderId>' to check an order";
+      if (!nextSession.hasGreeted) {
+        nextSession.hasGreeted = true;
+
+        userResponse =
+          `Welcome ${name} 👋\n\n` +
+          "Reply:\n" +
+          "- 'menu' to view products\n" +
+          "- 'order history' to view past orders\n" +
+          "- 'status <orderId>' to check an order";
+      } else {
+        userResponse = "Reply 'menu' to continue 🙂"
+      }
     }
 
     else if (command.type === "SHOW_MENU") {

@@ -23,7 +23,7 @@ router.post("/", async (req, res) => {
     const payload = adaptWhatsAppPayload(req.body);
     if (!payload) return res.sendStatus(200);
 
-    const { senderId, messageId, text } = payload;
+    const { senderId, messageId, text, customerName } = payload;
 
     const duplicate = await isDuplicate(messageId);
     if (duplicate) return res.sendStatus(200);
@@ -34,10 +34,16 @@ router.post("/", async (req, res) => {
     if (!session || session.expiresAt < now) {
       session = {
         customerId: senderId,
+        customerName: customerName || null,
         state: "IDLE",
         cart: [],
+        hasGreeted: false,
         expiresAt: new Date(now + SESSION_TTL_MS)
       };
+    }
+
+    if (customerName && !session.customerName) {
+      session.customerName = customerName;
     }
 
     const command = parseMessage(text);
