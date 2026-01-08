@@ -6,15 +6,17 @@ const sessionService = {
     },
 
     async save(session) {
-        const { customerId, state, cart, expiresAt } = session;
+        const { customerId, customerName, state, cart, hasGreeted, expiresAt } = session;
 
         return ChatSession.findOneAndUpdate(
             { customerId },
             {
             $set: {
                 customerId,
+                customerName,
                 state,
                 cart,
+                hasGreeted,
                 expiresAt
             }
             },
