@@ -4,7 +4,7 @@ import { formatCurrency } from "../utils/formatCurrency.js";
 export const processMessage = async ({ session, command }) => {
   const nextSession = {
     customerId: session.customerId,
-	customerName: session.customerName || null,
+	  customerName: session.customerName || null,
     state: session.state || "IDLE",
     cart: Array.isArray(session.cart) ? session.cart : [],
     hasGreeted: session.hasGreeted || false
@@ -73,7 +73,6 @@ export const processMessage = async ({ session, command }) => {
   // ───────────── IDLE ─────────────
   if (nextSession.state === "IDLE") {
     if (command.type === "GREET") {
-    // if (command.type === "GREET" &&  !nextSession.hasGreeted) {
       if (!nextSession.hasGreeted) {
         nextSession.hasGreeted = true;
 
