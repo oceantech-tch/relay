@@ -86,7 +86,7 @@ export const processMessage = async ({ session, command }) => {
             "- 'menu' to view products\n" +
             "- 'order history' to view past orders\n" +
             "- 'status <orderId>' to check an order"
-        };
+        }
       }
         // return {
         //   nextSession,

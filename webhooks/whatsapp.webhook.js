@@ -30,6 +30,7 @@ router.post("/", async (req, res) => {
 
     const now = Date.now();
     let session = await sessionService.get({"DETTING SESSION:", senderId, "CUSTOMER ID:", customerId});
+    
     console.log("SESSION FROM STORE:", session)
 
     if (!session || session.expiresAt < now) {
