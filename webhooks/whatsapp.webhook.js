@@ -29,7 +29,7 @@ router.post("/", async (req, res) => {
     if (duplicate) return res.sendStatus(200);
 
     const now = Date.now();
-    let session = await sessionService.get(senderId);
+    let session = await sessionService.get("DETTING SESSION:", senderId, "CUSTOMER ID:", customerId);
     console.log("SESSION FROM STORE:", session)
 
     if (!session || session.expiresAt < now) {
@@ -55,6 +55,7 @@ router.post("/", async (req, res) => {
       ...nextSession,
       customerName: nextSession.customerName,
       expiresAt: new Date(now + SESSION_TTL_MS)
+      console.log("SAVING SESSION:", session.customerId, session.hasGreeted)
     });
 
     // ───────── ACTIONS ─────────
