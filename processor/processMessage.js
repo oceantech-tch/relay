@@ -4,6 +4,7 @@ import { formatCurrency } from "../utils/formatCurrency.js";
 export const processMessage = async ({ session, command }) => {
   const nextSession = {
     customerId: session.customerId,
+	customerName: session.customerName || null,
     state: session.state || "IDLE",
     cart: Array.isArray(session.cart) ? session.cart : [],
     hasGreeted: session.hasGreeted || false
@@ -16,7 +17,6 @@ export const processMessage = async ({ session, command }) => {
   if (command.type === "CANCEL_FLOW") {
     nextSession.state = "IDLE";
     nextSession.cart = [];
-    nextSession.hasGreeted = false;
 
     return {
       nextSession,
@@ -71,21 +71,28 @@ export const processMessage = async ({ session, command }) => {
   }
 
   // ───────────── IDLE ─────────────
-  if (nextSession.state === "IDLE") {
     if (command.type === "GREET") {
       if (!nextSession.hasGreeted) {
         nextSession.hasGreeted = true;
 
         const name = nextSession.customerName || "there";
-        userResponse =
-          `Welcome ${name} 👋\n\n` +
+	return {
+        
+          nextSession,
+	  actions,
+	  userResponse:
+	  `Welcome ${name} 👋\n\n` +
           "Reply:\n" +
           "- 'menu' to view products\n" +
           "- 'order history' to view past orders\n" +
           "- 'status <orderId>' to check an order";
-      } else {
-        userResponse = "Reply 'menu' to continue 🙂"
-      }
+	 };
+	}
+        return {
+		nextSession,
+		actions,
+		userResponse: "Reply 'menu' to continue 🙂"
+	};
     }
 
     else if (command.type === "SHOW_MENU") {

@@ -25,7 +25,7 @@ export const adaptWhatsAppPayload = (body) => {
       senderId: message.from,
       messageId: message.id,
       text: message.text.body,
-      customerName: change?.contacts?.[0]?.profile?.name || null
+      customerName: value?.contacts?.[0]?.profile?.name || null
     };
   } catch (err) {
     console.error("WhatsApp adapter error:", err);

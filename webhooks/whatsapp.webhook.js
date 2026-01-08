@@ -52,7 +52,7 @@ router.post("/", async (req, res) => {
 
     await sessionService.save({
       ...nextSession,
-      customerName: session.customerName,
+      customerName: nextSession.customerName,
       expiresAt: new Date(now + SESSION_TTL_MS)
     });
 
