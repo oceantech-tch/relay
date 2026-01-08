@@ -72,7 +72,7 @@ export const processMessage = async ({ session, command }) => {
 
   // ───────────── IDLE ─────────────
   if (nextSession.state === "IDLE") {
-    if (command.type === "GREET") {
+    if (command.type === "GREET" &&  !nextSession.hasGreeted) {
       if (!nextSession.hasGreeted) {
         nextSession.hasGreeted = true;
 
@@ -88,11 +88,11 @@ export const processMessage = async ({ session, command }) => {
             "- 'status <orderId>' to check an order"
         };
       }
-        return {
-          nextSession,
-          actions,
-          userResponse: "Reply 'menu' to continue 🙂"
-        };
+        // return {
+        //   nextSession,
+        //   actions,
+        //   userResponse: "Reply 'menu' to continue 🙂"
+        // };
     }
 
     else if (command.type === "SHOW_MENU") {
