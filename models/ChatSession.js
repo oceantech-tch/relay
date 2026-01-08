@@ -17,6 +17,9 @@ const chatSessionSchema = new mongoose.Schema(
             required: true,
             unique: true
         },
+        customerName: {
+            type: String
+        },
         state: {
             type: String,
             enum: [
@@ -27,6 +30,10 @@ const chatSessionSchema = new mongoose.Schema(
                 "ORDER_PLACED"
             ],
             default: "IDLE"
+        },
+        hasGreeted: {
+            type: Boolean,
+            default: false
         },
         cart: [cartItemSchema],
         expiresAt: {
